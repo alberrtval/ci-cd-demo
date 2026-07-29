@@ -1,0 +1,72 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    name: Integración Continua (Lint + Tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, sqlite, pdo_sqlite
+          coverage: none
+
+      - name: Copiar archivo de entorno
+        run: cp .env.example .env
+
+      - name: Instalar dependencias de Composer
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Generar clave de la aplicación
+        run: php artisan key:generate
+
+      - name: Revisar estilo de código (Laravel Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: Ejecutar pruebas
+        run: php artisan test
+
+  cd:
+    name: Despliegue Continuo
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Instalar dependencias (producción)
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Compilar assets de producción
+        run: |
+          npm install
+          npm run build
+
+      - name: Desplegar a producción (simulado)
+        run: |
+          echo "CI aprobado. Iniciando despliegue..."
+          echo "Desplegando versión ${{ github.sha }} a producción."
+          echo "Despliegue completado con éxito."
